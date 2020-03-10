@@ -5,6 +5,8 @@ import water.*;
 import water.api.FSIOException;
 import water.api.HDFSIOException;
 import water.exceptions.H2OIllegalArgumentException;
+import water.fvec.FileVec;
+import water.fvec.Vec;
 import water.parser.BufferedString;
 import water.util.FileUtils;
 import water.util.Log;
@@ -186,6 +188,13 @@ public class PersistManager {
   public byte[] load(int backend, Value v) throws IOException {
     stats[backend].load_count.incrementAndGet();
     byte[] arr = I[backend].load(v);
+    stats[backend].load_bytes.addAndGet(arr.length);
+    return arr;
+  }
+
+  public byte[] load(int backend, Key k, long skip, int max) throws IOException {
+    stats[backend].load_count.incrementAndGet();
+    byte[] arr = I[backend].load(k, skip, max);
     stats[backend].load_bytes.addAndGet(arr.length);
     return arr;
   }
@@ -598,6 +607,25 @@ public class PersistManager {
     }
   }
 
+  public InputStream openSeekable(Vec vec) {
+    if (vec instanceof FileVec) {
+      FileVec fileVec = (FileVec) vec;
+      final String path = fileVec.getPath();
+      if (isHdfsPath(path)) {
+        validateHdfsConfigured();
+        return I[Value.HDFS].openSeekable(path);
+      } else {
+        Persist p = I[fileVec.getBackend()];
+        if (p != null && p.isSeekableOpenSupported()) {
+          return p.openSeekable(path);
+        }
+      }
+    }
+    // fallback
+    validateHdfsConfigured();
+    return I[Value.HDFS].wrapSeekable(vec);
+  }
+  
   // Writes
 
   public boolean mkdirs(String path) {

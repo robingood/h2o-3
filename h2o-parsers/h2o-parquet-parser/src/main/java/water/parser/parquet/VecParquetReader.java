@@ -20,13 +20,18 @@ package water.parser.parquet;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.Path;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.compat.RowGroupFilter;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import water.H2O;
+import water.fvec.FileVec;
+import water.fvec.HDFSFileVec;
 import water.fvec.Vec;
 import water.parser.ParseWriter;
+import water.persist.PersistHdfs;
 import water.persist.VecDataInputStream;
 import water.persist.VecFileSystem;
 import water.util.Log;
@@ -87,10 +92,18 @@ public class VecParquetReader implements Closeable {
 
   private void initReader() throws IOException {
     assert reader == null;
-    Configuration conf = VecFileSystem.makeConfiguration(vec);
+    final Configuration conf;
+    final Path path;
+    if (vec instanceof HDFSFileVec) {
+      conf = PersistHdfs.CONF;
+      path = new Path(((HDFSFileVec) vec).getPath());
+    } else {
+      conf = VecFileSystem.makeConfiguration(vec);
+      path = VecFileSystem.VEC_PATH;
+    }
     conf.setInt(PARQUET_READ_PARALLELISM, 1); // disable parallelism (just one virtual file!)
     ChunkReadSupport crSupport = new ChunkReadSupport(writer, chunkSchema, _keepColumns);
-    ParquetReader.Builder<Long> prBuilder = ParquetReader.builder(crSupport, VecFileSystem.VEC_PATH)
+    ParquetReader.Builder<Long> prBuilder = ParquetReader.builder(crSupport, path)
             .withConf(conf)
             .withFilter(new FilterCompat.Filter() {
               @Override
@@ -115,7 +128,7 @@ public class VecParquetReader implements Closeable {
   public static byte[] readFooterAsBytes(Vec vec) {
     FSDataInputStream f = null;
     try {
-      f = new FSDataInputStream(new VecDataInputStream(vec));
+      f = (FSDataInputStream) H2O.getPM().openSeekable(vec);
       final int FOOTER_LENGTH_SIZE = 4;
       if (vec.length() < MAGIC.length + FOOTER_LENGTH_SIZE + MAGIC.length) { // MAGIC + data + footer + footerIndex + MAGIC
         throw new RuntimeException("Vec doesn't represent a Parquet data (too short)");

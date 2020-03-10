@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import water.*;
+import water.fvec.Vec;
 import water.util.Log;
 
 /** Abstract class describing various persistence targets.
@@ -24,6 +25,11 @@ public abstract class Persist {
 
   /** Load a previously stored Value */
   abstract public byte[] load(Value v) throws IOException;
+
+  public byte[] load(Key k, long skip, int max) throws IOException {
+    throw new UnsupportedOperationException(
+            "Persist Backend " + this.getClass().getSimpleName() + " doesn't support direct data read.");
+  }
 
   /** Reclaim space from a previously stored Value */
   abstract public void delete(Value v);
@@ -214,6 +220,18 @@ public abstract class Persist {
   }
 
   public InputStream open(String path) {
+    throw new RuntimeException("Not implemented");
+  }
+
+  public InputStream openSeekable(String path) {
+    throw new RuntimeException("Not implemented");
+  }
+
+  public boolean isSeekableOpenSupported() {
+    return false;
+  }
+
+  public InputStream wrapSeekable(Vec vec) {
     throw new RuntimeException("Not implemented");
   }
 

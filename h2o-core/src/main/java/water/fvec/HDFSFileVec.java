@@ -2,6 +2,8 @@ package water.fvec;
 
 import water.*;
 
+import java.io.IOException;
+
 /**
  * Vec representation of file stored on HDFS.
  */
@@ -29,5 +31,14 @@ public final class HDFSFileVec extends FileVec {
     return k;
   }
 
-
+  @Override
+  public byte[] getFirstBytes() {
+    try {
+      int max = (long) _chunkSize > _len ? (int) _len : _chunkSize;
+      return H2O.getPM().load(Value.HDFS, _key, 0L, max);
+    } catch (IOException e) {
+      throw new RuntimeException("HDFS read failed", e);
+    }
+  }
+  
 }
